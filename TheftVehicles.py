@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.stats import chi2_contingency, norm
 
 # Load dataset
 df = pd.read_csv("/stolen_vehicles.csv")
@@ -29,7 +30,6 @@ plt.pie(vehicle_counts.values, labels=vehicle_counts.index, autopct='%1.1f%%', s
 plt.title("Top 10 Stolen Vehicle Types (Pie Chart)")
 plot_idx += 1
 
-
 # --- Objective 3: Model Year vs. Theft Frequency (box plot) ---
 plt.subplot(3, 2, plot_idx)
 sns.boxplot(x=df['model_year'].dropna())
@@ -46,12 +46,14 @@ plt.xlabel("Count")
 plt.ylabel("Color")
 plot_idx += 1
 
-# --- Objective 5: Location-Based Theft Heatmap (smaller data) ---
+# --- Objective 5: Location-Based Theft Heatmap (smaller data) 
 subset_df = df[['vehicle_type', 'location_id']].dropna()
 top_vehicle_types = subset_df['vehicle_type'].value_counts().nlargest(5).index
 top_locations = subset_df['location_id'].value_counts().nlargest(5).index
-filtered_df = subset_df[subset_df['vehicle_type'].isin(top_vehicle_types) & 
-                        subset_df['location_id'].isin(top_locations)]
+filtered_df = subset_df[
+    subset_df['vehicle_type'].isin(top_vehicle_types) & 
+    subset_df['location_id'].isin(top_locations)
+]
 heatmap_data = filtered_df.pivot_table(index='vehicle_type', columns='location_id', aggfunc=len, fill_value=0)
 
 plt.subplot(3, 2, plot_idx)
@@ -62,3 +64,27 @@ plt.ylabel("Vehicle Type")
 
 plt.tight_layout()
 plt.show()
+
+# Statistical Tests
+
+# Test 1: Chi-Square Test between 'vehicle_type' and 'color'
+if 'vehicle_type' in df.columns and 'color' in df.columns:
+    chi_df = df[['vehicle_type', 'color']].dropna()
+    if not chi_df.empty:
+        contingency = pd.crosstab(chi_df['vehicle_type'], chi_df['color'])
+        if contingency.shape[0] > 1 and contingency.shape[1] > 1:
+            chi2, p, _, _ = chi2_contingency(contingency)
+            print("\nChi-Square Test between vehicle_type and color:")
+            print(f"P-Value = {p:.4f} →", "Significant" if p < 0.05 else "Not Significant")
+
+# Test 2: Z-Test - Model Year vs Hypothetical Mean (e.g., 2010)
+model_years = df['model_year'].dropna()
+if len(model_years) > 30:
+    hypothesized_mean = 2010
+    sample_mean = model_years.mean()
+    std_dev = model_years.std(ddof=1)
+    sample_size = len(model_years)
+    z = (sample_mean - hypothesized_mean) / (std_dev / np.sqrt(sample_size))
+    p_val = 2 * (1 - norm.cdf(abs(z)))
+    print(f"\nZ-Test on Model Year vs {hypothesized_mean}:")
+    print(f"Z-Score = {z:.2f}, P-Value = {p_val:.4f} →", "Significant" if p_val < 0.05 else "Not Significant")
